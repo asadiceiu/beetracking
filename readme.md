@@ -1,6 +1,9 @@
 # Bee Tracking
-A new line
+## Installing multiple libraries using pip command for python
 
-1. a
-2. b
-3. c
+`pip install -r <filename>`
+
+e.g.
+
+`pip install -r requirements.txt`
+
