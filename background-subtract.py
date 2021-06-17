@@ -10,12 +10,7 @@ insectMinThresh = 500.0
 insectMaxThresh = 4000.0
 startPosition = 0
 
-
-cap = cv2.VideoCapture(("{}/{}".format(base_folder,filelist[10])))
-cap.set(cv2.CAP_PROP_POS_FRAMES,startPosition)
-wrt = cv2.VideoWriter('predicted-bees/video.avi', cv2.VideoWriter_fourcc('M','J','P','G'), 30, (int(cap.get(cv2.CAP_PROP_FRAME_WIDTH)), int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))))
-nFrames = cap.get(cv2.CAP_PROP_FRAME_COUNT)
-
+#create a KNN background subtractor
 bg = cv2.createBackgroundSubtractorKNN()
 cv2.namedWindow("Frame", cv2.WINDOW_NORMAL)
 cv2.namedWindow("Mask", cv2.WINDOW_NORMAL)
@@ -33,6 +28,24 @@ def findInsects(binary_image):
             insects = np.vstack([insects, (x,y,w*h)])
     return insects, contours
 
+def findInsectsCC(binary_image):
+    '''
+    Finds insects using connected component analysis of the binary image which is 
+    expected to be filtered with median blur and erosion technique to eliminate
+    all high frequency noises
+    '''
+    (nlabels, labels, stats, centroids) = cv2.connectedComponentsWithStats(binary_image, connectivity=8)
+    positions = np.zeros(shape=(0,8)) #left, top, w, h, area, centroid, label
+    mask = np.zeros_like(binary_image)
+    if nlabels>1: #the first label is always the background
+        for i in range(1,nlabels):
+            if stats[i,4] > insectMinThresh and stats[i,4] <= insectMaxThresh:
+                positions = np.vstack([positions, (stats[i,0], stats[i,1], stats[i,2], stats[i,3], stats[i,4], centroids[i,0], centroids[i,1], i)])
+                cmask = (labels == i).astype("uint8") * 255
+                mask = np.bitwise_or(mask, cmask)
+    return mask, positions
+
+
 def draw_label(img, text, pos, bg_color):
     font_face = cv2.FONT_HERSHEY_SIMPLEX
     scale = 0.4
@@ -49,44 +62,45 @@ def draw_label(img, text, pos, bg_color):
     cv2.putText(img, text, pos, font_face, scale, color, 1, cv2.LINE_AA)
     return img
 
-def processImage(frame, counter=0):
+def processImage(frame):
     median = cv2.medianBlur(frame, 9)
     kernel = np.ones((5,5), np.uint8)
     erode = cv2.erode(median, kernel=kernel, iterations=1)
-    insects, contours = findInsects(erode)
-    if len(insects)>0:
-        with open('insect-pos.txt','a+') as fp:
-            fp.write('\n')
-            txt = "\n".join([", ".join([str(insect[0]),str(insect[1]),str(insect[2])]) for insect in insects])
-            fp.write(txt)
-        return erode, contours
-    return erode, False
-
-def showImages(frame, mask, counter):
+    return findInsectsCC(erode)
     
-    mask, contours = processImage(mask, counter)
-    frame = draw_label(frame, "Frame No:{}/{}, FPS:{}".format(cap.get(cv2.CAP_PROP_POS_FRAMES),nFrames, cap.get(cv2.CAP_PROP_FPS)),(20,20), (0,255,0)) #B,G,R
-    if contours and np.sum(np.uint8(mask>0),axis=None)>200:
-        frame = cv2.drawContours(frame,contours,-1,(0,0,255))
-        
-        frame[:,:,2] = mask
+
+def showImages(frame, mask, fname, counter):
+    insects, positions = processImage(mask)
+    frame = draw_label(frame, "Video: {}, Frame No:{}/{}, FPS:{}".format(fname, cap.get(cv2.CAP_PROP_POS_FRAMES),nFrames, cap.get(cv2.CAP_PROP_FPS)),(20,20), (0,255,0)) #B,G,R
+    if len(positions)>0:
+        frame[:,:,2] = insects
         #cv2.imwrite("predicted-bees/frame-{:06d}.jpg".format(counter+startPosition),frame)
         #cv2.imwrite("predicted-bees/mask-{:06d}.jpg".format(counter,startPosition),mask)        
         wrt.write(frame)
-    cv2.imshow("Mask", mask)
+    cv2.imshow("Mask", insects)
     cv2.imshow("Frame",frame)
 
-counter = 0
-while cap.isOpened():
-    state, frame = cap.read()
-    counter += 1
-    if state:
-        mask = bg.apply(frame)
-        showImages(frame, mask, counter)
-        if cv2.waitKey(25) & 0xFF == ord('q'):
+for fname in filelist[10:]:
+    #Creating a video capture and video writter object 
+    cap = cv2.VideoCapture(("{}/{}".format(base_folder,fname)))
+    cap_w, cap_h = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH)), int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
+    nFrames = cap.get(cv2.CAP_PROP_FRAME_COUNT)
+    dirname = os.path.splitext(fname)[0]
+    if not os.path.isdir("background-subtract/{}".format(dirname)):
+        os.mkdir("background-subtract/{}".format(dirname))
+    wrt = cv2.VideoWriter("background-subtract/{0}/{0}.avi".format(dirname), cv2.VideoWriter_fourcc('M','J','P','G'), 24, (cap_w, cap_h))
+    counter = 0
+    while cap.isOpened():
+        state, frame = cap.read()
+        counter += 1
+        if state:
+            mask = bg.apply(frame)
+            showImages(frame, mask, fname, counter)
+            if cv2.waitKey(25) & 0xFF == ord('q'):
+                break
+        else:
             break
-    else:
-        break
-cap.release()
-wrt.release()
+    cap.release()
+    wrt.release()
+        
 cv2.destroyAllWindows()
