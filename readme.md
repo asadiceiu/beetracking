@@ -7,4 +7,11 @@ e.g.
 
 `pip install -r requirements.txt`
 
-Huh
+## Checking OpenCV Cameras
+### Import necessary modules:
+`
+import numpy as np
+import os
+import cv2
+`
+asad
