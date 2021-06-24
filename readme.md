@@ -9,9 +9,9 @@ e.g.
 
 ## Checking OpenCV Cameras
 ### Import necessary modules:
-`
+```
 import numpy as np
 import os
 import cv2
-`
+```
 asad
