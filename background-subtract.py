@@ -2,18 +2,20 @@ import numpy as np
 import os
 import cv2
 import matplotlib.pyplot as plt
+import time
+import datetime
 
 base_folder = 'raw-data'
 filelist = os.listdir(base_folder)
 
-insectMinThresh = 500.0 
-insectMaxThresh = 4000.0
+insectMinThresh = 10.0 
+insectMaxThresh = 1000.0
 startPosition = 0
 
 #create a KNN background subtractor
 bg = cv2.createBackgroundSubtractorKNN()
-cv2.namedWindow("Frame", cv2.WINDOW_NORMAL)
-cv2.namedWindow("Mask", cv2.WINDOW_NORMAL)
+# cv2.namedWindow("Frame", cv2.WINDOW_NORMAL)
+# cv2.namedWindow("Mask", cv2.WINDOW_NORMAL)
 
 
 def findInsects(binary_image):
@@ -69,7 +71,7 @@ def processImage(frame):
     return findInsectsCC(erode)
     
 
-def showImages(frame, mask, fname, counter):
+def showImages(frame, mask, fname, counter, wrt):
     insects, positions = processImage(mask)
     frame = draw_label(frame, "Video: {}, Frame No:{}/{}, FPS:{}".format(fname, cap.get(cv2.CAP_PROP_POS_FRAMES),nFrames, cap.get(cv2.CAP_PROP_FPS)),(20,20), (0,255,0)) #B,G,R
     if len(positions)>0:
@@ -77,30 +79,34 @@ def showImages(frame, mask, fname, counter):
         #cv2.imwrite("predicted-bees/frame-{:06d}.jpg".format(counter+startPosition),frame)
         #cv2.imwrite("predicted-bees/mask-{:06d}.jpg".format(counter,startPosition),mask)        
         wrt.write(frame)
-    cv2.imshow("Mask", insects)
-    cv2.imshow("Frame",frame)
-
-for fname in filelist[10:]:
+    #cv2.imshow("Mask", insects)
+    #cv2.imshow("Frame",frame)
+filelist = ['S1.mp4']
+for fname in filelist:
     #Creating a video capture and video writter object 
-    cap = cv2.VideoCapture(("{}/{}".format(base_folder,fname)))
+    cap = cv2.VideoCapture(("{}".format(fname)))
     cap_w, cap_h = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH)), int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
     nFrames = cap.get(cv2.CAP_PROP_FRAME_COUNT)
     dirname = os.path.splitext(fname)[0]
-    if not os.path.isdir("background-subtract/{}".format(dirname)):
-        os.mkdir("background-subtract/{}".format(dirname))
-    wrt = cv2.VideoWriter("background-subtract/{0}/{0}.avi".format(dirname), cv2.VideoWriter_fourcc('M','J','P','G'), 24, (cap_w, cap_h))
+    # if not os.path.isdir("background-subtract/{}".format(dirname)):
+    #     os.mkdir("background-subtract/{}".format(dirname))
+    wrt = cv2.VideoWriter("{0}.avi".format(dirname), cv2.VideoWriter_fourcc('M','J','P','G'), 2, (cap_w, cap_h))
     counter = 0
     while cap.isOpened():
         state, frame = cap.read()
         counter += 1
+        if counter > 200:
+            break
         if state:
             mask = bg.apply(frame)
-            showImages(frame, mask, fname, counter)
+            showImages(frame, mask, fname, counter, wrt)
+            print("*",end='')
             if cv2.waitKey(25) & 0xFF == ord('q'):
                 break
         else:
             break
     cap.release()
     wrt.release()
+    print("{}: {} Written successfully".format(datetime.datetime.fromtimestamp(time.time()).strftime("%H:%M:%S"),fname))
         
 cv2.destroyAllWindows()

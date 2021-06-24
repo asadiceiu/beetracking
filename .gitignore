@@ -1,3 +1,5 @@
 raw-data/*.mp4
 predicted-bees/*.jpg
 background-subtract/*.avi
+*.mp4
+*.avi

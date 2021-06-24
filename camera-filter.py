@@ -1,5 +1,7 @@
 import numpy as np
 import cv2
+import time
+import datetime
 
 ## Step 1: Get Video from the camera
 ## Step 2: Get input: Left, Right, Top, Down, Diagonal Top-left, Diagonal Top-right, Diagonal Bottom-left, Diagonal Bottom-right
@@ -45,7 +47,7 @@ while state:
     if key == 27: #27 is the value for ESC key. #cv2.waitKey(10) & 0xFF == ord('q'):
         break
     state, frame = cap.read()
-cv2.imwrite('filterdimage.jpg',newframe)
+cv2.imwrite('filterdimage-{}.jpg'.format(datetime.datetime.fromtimestamp(time.time()).strftime("%Y-%m-%D-%H:%M:%S")),newframe)
 cap.release()
 cv2.destroyAllWindows()
 
